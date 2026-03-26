@@ -14,44 +14,45 @@ async function main()
     try {
         const contents: any = [];
 
-        while(true) {
+        while(true) 
+        {
             const question = await rl.question('Your prompt: ');
             contents.push({ role: 'user', content: question })
 
-            const result = await ai.responses.create({
-                model: process.env.GROQ_MODEL!,
-                input: JSON.stringify(contents),
-                tools: tools
-            });
-
-            contents.push(result.output);
-
-            for(const item of result.output)
+            while(true)
             {
-                if(item.type !== 'function_call') continue;
+                const result = await ai.responses.create({
+                    model: process.env.GROQ_MODEL!,
+                    input: contents,
+                    tools: tools
+                });
+    
+                contents.push(result.output);
+    
+                if(result.output_text !== '') console.log("\n\n" + result.output_text);
 
-                const handler = toolMap[item.name];
-                if(handler)
+                let call: boolean = false;
+                for(const item of result.output)
                 {
-                    const result = await handler();
-  
-                    contents.push({
-                        type: "function_call_output",
-                        call_id: item.call_id,
-                        output: JSON.stringify(result)
-                    });
+                    if(item.type !== 'function_call') continue;
+    
+                    call = true;
 
-                    break;
+                    const handler = toolMap[item.name];
+                    if(handler)
+                    {
+                        const result = await handler();
+      
+                        contents.push({
+                            type: "function_call_output",
+                            call_id: item.call_id,
+                            output: JSON.stringify(result)
+                        });
+                    }
                 }
+
+                if(!call) break;
             }
-
-            const finalResult = await ai.responses.create({
-                model: process.env.GROQ_MODEL!,
-                input: JSON.stringify(contents),
-                tools
-            })
-
-            console.log(finalResult.output_text);
         }
     } finally {
         rl.close();
